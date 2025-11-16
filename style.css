@@ -104,9 +104,6 @@ nav a:hover {
   color: #3b2c1a;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.75);
-  padding: 4px 10px;
-  border-radius: 999px;
 }
 
 .about {

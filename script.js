@@ -171,8 +171,9 @@ const setupLightbox = () => {
   let isOpen = false;
   let zoomLevel = 1;
   const minZoom = 1;
-  const maxZoom = 4;
+  const maxZoom = 16;
   const zoomMultiplier = 1.25;
+  const quickZoomLevel = 10;
   let panX = 0;
   let panY = 0;
   let isDragging = false;
@@ -391,7 +392,7 @@ const setupLightbox = () => {
       return;
     }
 
-    setZoom(2, event.clientX, event.clientY);
+    setZoom(Math.min(maxZoom, quickZoomLevel), event.clientX, event.clientY);
   };
 
   const handleOuterClick = (event) => {
