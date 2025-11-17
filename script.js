@@ -68,6 +68,63 @@ const detailData = {
   }
 };
 
+let hoverAudioContext;
+let hoverMasterGain;
+let isHoverSoundMuted = true;
+const HOVER_ROOT_NOTES = [130.81, 146.83, 164.81, 196.0, 220.0];
+const MAX_HOVER_VOICES = 8;
+
+const ensureHoverAudio = () => {
+  if (!hoverAudioContext) {
+    hoverAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+    hoverMasterGain = hoverAudioContext.createGain();
+    hoverMasterGain.gain.value = isHoverSoundMuted ? 0 : 0.9;
+    hoverMasterGain.connect(hoverAudioContext.destination);
+  }
+
+  if (hoverAudioContext.state === 'suspended') {
+    hoverAudioContext.resume();
+  }
+};
+
+const updateAudioToggleButton = () => {
+  const toggle = document.getElementById('audio-toggle');
+  if (!toggle) return;
+
+  const icon = toggle.querySelector('img');
+  const isActive = !isHoverSoundMuted;
+  toggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  toggle.setAttribute('aria-label', isActive ? 'Mute hover sounds' : 'Unmute hover sounds');
+
+  if (icon) {
+    icon.src = isActive ? 'images/Index/Unmuted.png' : 'images/Index/Muted.png';
+    icon.alt = isActive ? 'Unmuted speaker icon' : 'Muted speaker icon';
+  }
+};
+
+const setHoverSoundMuted = (muted) => {
+  isHoverSoundMuted = muted;
+  if (hoverMasterGain) {
+    hoverMasterGain.gain.value = muted ? 0 : 0.9;
+  }
+  updateAudioToggleButton();
+};
+
+const setupAudioToggle = () => {
+  const toggle = document.getElementById('audio-toggle');
+  if (!toggle) return;
+
+  updateAudioToggleButton();
+  toggle.addEventListener('click', () => {
+    if (isHoverSoundMuted) {
+      ensureHoverAudio();
+      setHoverSoundMuted(false);
+    } else {
+      setHoverSoundMuted(true);
+    }
+  });
+};
+
 const renderDetailPage = () => {
   const pageKey = document.body.dataset.gallery;
   const detailRoot = document.getElementById('detail-root');
@@ -494,26 +551,12 @@ const setupThumbnailTones = () => {
   const cards = Array.from(document.querySelectorAll('.gallery .card'));
   if (!cards.length) return;
 
-  let audioContext;
-  let masterGain;
   const activeVoices = new Set();
-  const MAX_VOICES = 8; // prevent audio overload
-
-  // Lower notes, but chords will add higher overtones
-  const rootNotes = [130.81, 146.83, 164.81, 196.00, 220.00];
-
-  const ensureAudio = () => {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      masterGain = audioContext.createGain();
-      masterGain.gain.value = 0.9;
-      masterGain.connect(audioContext.destination);
-    }
-    if (audioContext.state === "suspended") audioContext.resume();
-  };
 
   const playChord = (rootFreq) => {
-    ensureAudio();
+    if (isHoverSoundMuted) return;
+
+    ensureHoverAudio();
 
     // Chord tones (root + perfect fifth + nice mellow ninth)
     const freqs = [
@@ -522,19 +565,19 @@ const setupThumbnailTones = () => {
       rootFreq * 1.12246     // major 9th (beautifully airy)
     ];
 
-    const now = audioContext.currentTime;
+    const now = hoverAudioContext.currentTime;
     const voiceGroup = [];
 
     // Kill old voices if too many
-    if (activeVoices.size > MAX_VOICES) {
+    if (activeVoices.size > MAX_HOVER_VOICES) {
       const oldest = activeVoices.values().next().value;
       oldest.stop();
       activeVoices.delete(oldest);
     }
 
     freqs.forEach((freq, i) => {
-      const osc = audioContext.createOscillator();
-      const g = audioContext.createGain();
+      const osc = hoverAudioContext.createOscillator();
+      const g = hoverAudioContext.createGain();
 
       // Slight wave variation per voice
       osc.type = i === 0 ? "triangle" : "sine";
@@ -552,7 +595,7 @@ const setupThumbnailTones = () => {
       g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
 
       osc.connect(g);
-      g.connect(masterGain);
+      g.connect(hoverMasterGain);
 
       osc.start(now);
       osc.stop(now + 0.55);
@@ -571,7 +614,7 @@ const setupThumbnailTones = () => {
 
   // Attach event listeners
   cards.forEach((card, index) => {
-    const base = rootNotes[index % rootNotes.length];
+    const base = HOVER_ROOT_NOTES[index % HOVER_ROOT_NOTES.length];
     const trigger = () => playChord(base);
 
     card.addEventListener("mouseenter", trigger);
@@ -582,6 +625,7 @@ const setupThumbnailTones = () => {
 const init = () => {
   renderDetailPage();
   setupLightbox();
+  setupAudioToggle();
   setupThumbnailTones();
 };
 

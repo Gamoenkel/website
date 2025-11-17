@@ -11,6 +11,25 @@ header {
   margin-top: 40px;
 }
 
+.audio-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  z-index: 20;
+  width: 56px;
+  height: 56px;
+}
+
+.audio-toggle img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .logo-section {
   display: inline-block;
 }
