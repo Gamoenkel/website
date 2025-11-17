@@ -104,6 +104,7 @@ nav a:hover {
   object-fit: cover;
   display: block;
   box-shadow: 0 10px 40px rgba(59, 44, 26, 0.08);
+  transition: transform 0.2s ease;
 }
 
 .card p {
@@ -300,6 +301,10 @@ body[data-gallery="about"] main {
 .detail-item:hover img,
 .detail-item:focus-visible img {
   filter: drop-shadow(0 10px 20px rgba(59, 44, 26, 0.25));
+}
+
+.card:hover img {
+  transform: rotate(2deg);
 }
 
 .lightbox {
