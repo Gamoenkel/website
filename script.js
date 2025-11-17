@@ -492,49 +492,90 @@ const setupLightbox = () => {
 
 const setupThumbnailTones = () => {
   const cards = Array.from(document.querySelectorAll('.gallery .card'));
-  if (!cards.length) {
-    return;
-  }
+  if (!cards.length) return;
 
   let audioContext;
-  let gainNode;
-  const frequencies = [261.63, 293.66, 329.63, 392.0, 440.0];
+  let masterGain;
+  const activeVoices = new Set();
+  const MAX_VOICES = 8; // prevent audio overload
+
+  // Lower notes, but chords will add higher overtones
+  const rootNotes = [130.81, 146.83, 164.81, 196.00, 220.00];
 
   const ensureAudio = () => {
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      gainNode = audioContext.createGain();
-      gainNode.gain.value = 0;
-      gainNode.connect(audioContext.destination);
+      masterGain = audioContext.createGain();
+      masterGain.gain.value = 0.9;
+      masterGain.connect(audioContext.destination);
     }
-
-    if (audioContext.state === 'suspended') {
-      audioContext.resume();
-    }
+    if (audioContext.state === "suspended") audioContext.resume();
   };
 
-  const playTone = (frequency) => {
+  const playChord = (rootFreq) => {
     ensureAudio();
-    const oscillator = audioContext.createOscillator();
-    oscillator.type = 'sine';
-    oscillator.frequency.value = frequency;
-    oscillator.connect(gainNode);
+
+    // Chord tones (root + perfect fifth + nice mellow ninth)
+    const freqs = [
+      rootFreq,
+      rootFreq * 1.5,        // perfect 5th
+      rootFreq * 1.12246     // major 9th (beautifully airy)
+    ];
 
     const now = audioContext.currentTime;
-    gainNode.gain.cancelScheduledValues(now);
-    gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(0.18, now + 0.03);
-    gainNode.gain.linearRampToValueAtTime(0, now + 0.35);
+    const voiceGroup = [];
 
-    oscillator.start(now);
-    oscillator.stop(now + 0.4);
+    // Kill old voices if too many
+    if (activeVoices.size > MAX_VOICES) {
+      const oldest = activeVoices.values().next().value;
+      oldest.stop();
+      activeVoices.delete(oldest);
+    }
+
+    freqs.forEach((freq, i) => {
+      const osc = audioContext.createOscillator();
+      const g = audioContext.createGain();
+
+      // Slight wave variation per voice
+      osc.type = i === 0 ? "triangle" : "sine";
+
+      // Add subtle random pitch bend target
+      const bend = freq * (1 + (Math.random() * 0.02 - 0.01)); // ±1%
+
+      // Start slightly detuned, glide into pitch
+      osc.frequency.setValueAtTime(freq * 0.98, now);
+      osc.frequency.exponentialRampToValueAtTime(bend, now + 0.12);
+
+      // Envelope: quick but smooth
+      g.gain.setValueAtTime(0.0, now);
+      g.gain.linearRampToValueAtTime(0.18 / (i + 1), now + 0.05); // softer on upper notes
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      osc.connect(g);
+      g.connect(masterGain);
+
+      osc.start(now);
+      osc.stop(now + 0.55);
+
+      // Track voices to stop overlap clipping
+      osc.onended = () => {
+        activeVoices.delete(osc);
+      };
+
+      activeVoices.add(osc);
+      voiceGroup.push(osc);
+    });
+
+    return voiceGroup;
   };
 
+  // Attach event listeners
   cards.forEach((card, index) => {
-    const note = frequencies[index % frequencies.length];
-    const triggerTone = () => playTone(note);
-    card.addEventListener('mouseenter', triggerTone);
-    card.addEventListener('focus', triggerTone);
+    const base = rootNotes[index % rootNotes.length];
+    const trigger = () => playChord(base);
+
+    card.addEventListener("mouseenter", trigger);
+    card.addEventListener("focus", trigger);
   });
 };
 
