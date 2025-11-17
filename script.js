@@ -490,9 +490,58 @@ const setupLightbox = () => {
   });
 };
 
+const setupThumbnailTones = () => {
+  const cards = Array.from(document.querySelectorAll('.gallery .card'));
+  if (!cards.length) {
+    return;
+  }
+
+  let audioContext;
+  let gainNode;
+  const frequencies = [261.63, 293.66, 329.63, 392.0, 440.0];
+
+  const ensureAudio = () => {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = audioContext.createGain();
+      gainNode.gain.value = 0;
+      gainNode.connect(audioContext.destination);
+    }
+
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+  };
+
+  const playTone = (frequency) => {
+    ensureAudio();
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    oscillator.connect(gainNode);
+
+    const now = audioContext.currentTime;
+    gainNode.gain.cancelScheduledValues(now);
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(0.18, now + 0.03);
+    gainNode.gain.linearRampToValueAtTime(0, now + 0.35);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.4);
+  };
+
+  cards.forEach((card, index) => {
+    const note = frequencies[index % frequencies.length];
+    const triggerTone = () => playTone(note);
+    card.addEventListener('mouseenter', triggerTone);
+    card.addEventListener('focus', triggerTone);
+  });
+};
+
 const init = () => {
   renderDetailPage();
   setupLightbox();
+  setupThumbnailTones();
 };
 
 document.addEventListener('DOMContentLoaded', init);
