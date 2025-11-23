@@ -14,6 +14,25 @@ const detailData = {
   },
   characters: {
     title: 'Characters',
+    description: `
+      <figure class="reference-art">
+        <img
+          src="images/Characters/Thumbnail.webp"
+          alt="Reference character concept art"
+          loading="lazy"
+        />
+        <figcaption>
+          Concept art by the incredible
+          <a
+            href="https://www.instagram.com/joep.eilander?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Joep Eilander
+          </a>
+        </figcaption>
+      </figure>
+    `,
     gallery: [
       { src: 'images/Characters/Screenshot_2025-10-21_202456.webp' },
       { src: 'images/Characters/Screenshot_2025-10-21_202831.webp' },
@@ -68,22 +87,17 @@ const detailData = {
   }
 };
 
-let hoverAudioContext;
-let hoverMasterGain;
+let hoverAudioElement;
 let isHoverSoundMuted = true;
-const HOVER_ROOT_NOTES = [130.81, 146.83, 164.81, 196.0, 220.0];
-const MAX_HOVER_VOICES = 8;
+const HOVER_SOUND_SRC = 'Sounds/Woep.ogg';
+const HOVER_SOUND_VOLUME = 0.9;
 
 const ensureHoverAudio = () => {
-  if (!hoverAudioContext) {
-    hoverAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-    hoverMasterGain = hoverAudioContext.createGain();
-    hoverMasterGain.gain.value = isHoverSoundMuted ? 0 : 0.9;
-    hoverMasterGain.connect(hoverAudioContext.destination);
-  }
-
-  if (hoverAudioContext.state === 'suspended') {
-    hoverAudioContext.resume();
+  if (!hoverAudioElement) {
+    hoverAudioElement = new Audio(HOVER_SOUND_SRC);
+    hoverAudioElement.preload = 'auto';
+    hoverAudioElement.volume = HOVER_SOUND_VOLUME;
+    hoverAudioElement.muted = isHoverSoundMuted;
   }
 };
 
@@ -104,9 +118,8 @@ const updateAudioToggleButton = () => {
 
 const setHoverSoundMuted = (muted) => {
   isHoverSoundMuted = muted;
-  if (hoverMasterGain) {
-    hoverMasterGain.gain.value = muted ? 0 : 0.9;
-  }
+  ensureHoverAudio();
+  hoverAudioElement.muted = muted;
   updateAudioToggleButton();
 };
 
@@ -551,74 +564,18 @@ const setupThumbnailTones = () => {
   const cards = Array.from(document.querySelectorAll('.gallery .card'));
   if (!cards.length) return;
 
-  const activeVoices = new Set();
-
-  const playChord = (rootFreq) => {
+  const playHoverSound = () => {
     if (isHoverSoundMuted) return;
 
     ensureHoverAudio();
-
-    // Chord tones (root + perfect fifth + nice mellow ninth)
-    const freqs = [
-      rootFreq,
-      rootFreq * 1.5,        // perfect 5th
-      rootFreq * 1.12246     // major 9th (beautifully airy)
-    ];
-
-    const now = hoverAudioContext.currentTime;
-    const voiceGroup = [];
-
-    // Kill old voices if too many
-    if (activeVoices.size > MAX_HOVER_VOICES) {
-      const oldest = activeVoices.values().next().value;
-      oldest.stop();
-      activeVoices.delete(oldest);
-    }
-
-    freqs.forEach((freq, i) => {
-      const osc = hoverAudioContext.createOscillator();
-      const g = hoverAudioContext.createGain();
-
-      // Slight wave variation per voice
-      osc.type = i === 0 ? "triangle" : "sine";
-
-      // Add subtle random pitch bend target
-      const bend = freq * (1 + (Math.random() * 0.02 - 0.01)); // ±1%
-
-      // Start slightly detuned, glide into pitch
-      osc.frequency.setValueAtTime(freq * 0.98, now);
-      osc.frequency.exponentialRampToValueAtTime(bend, now + 0.12);
-
-      // Envelope: quick but smooth
-      g.gain.setValueAtTime(0.0, now);
-      g.gain.linearRampToValueAtTime(0.18 / (i + 1), now + 0.05); // softer on upper notes
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-
-      osc.connect(g);
-      g.connect(hoverMasterGain);
-
-      osc.start(now);
-      osc.stop(now + 0.55);
-
-      // Track voices to stop overlap clipping
-      osc.onended = () => {
-        activeVoices.delete(osc);
-      };
-
-      activeVoices.add(osc);
-      voiceGroup.push(osc);
-    });
-
-    return voiceGroup;
+    const voice = hoverAudioElement.cloneNode(true);
+    voice.volume = HOVER_SOUND_VOLUME;
+    voice.play().catch(() => {});
   };
 
-  // Attach event listeners
-  cards.forEach((card, index) => {
-    const base = HOVER_ROOT_NOTES[index % HOVER_ROOT_NOTES.length];
-    const trigger = () => playChord(base);
-
-    card.addEventListener("mouseenter", trigger);
-    card.addEventListener("focus", trigger);
+  cards.forEach((card) => {
+    card.addEventListener('mouseenter', playHoverSound);
+    card.addEventListener('focus', playHoverSound);
   });
 };
 
