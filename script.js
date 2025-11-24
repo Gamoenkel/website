@@ -60,8 +60,8 @@ const detailData = {
   'other-works': {
     title: 'Other Works',
     gallery: [
-      { src: 'images/Other%20Works/Uhs.webp' },
       { src: 'images/Other%20Works/grehtre.webp' },
+      { src: 'images/Other%20Works/Thumbnail.webp' },
     ],
   },
   about: {
